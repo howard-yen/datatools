@@ -19,7 +19,7 @@ import sys
 
 from streaming import LocalDataset, StreamingDataset
 
-from datatools.io_utils import LocalDatasets, DatetimeJsonEncoder, RemoteDatasets
+from datatools.io_utils import LocalDatasets, DatetimeJsonEncoder, RemoteDatasets, PyArrowDataset
 from datatools.load import load, LoadOptions
 
 from simple_parsing import ArgumentParser
@@ -67,6 +67,33 @@ def dataset_summary(dataset):
             features = "inconsistent"
         else:
             features_dict = features_dicts[0]
+    elif isinstance(dataset, PyArrowDataset):
+        dataset_type = "PyArrowDataset"
+        # Extract schema information from PyArrow table
+        schema = dataset.table.schema
+        features_dict = {}
+        for field in schema:
+            # Convert PyArrow type to string representation
+            field_type = str(field.type)
+            # Handle special cases for better readability
+            if field_type.startswith('timestamp'):
+                field_type = 'timestamp'
+            elif field_type.startswith('date'):
+                field_type = 'date'
+            elif field_type.startswith('time'):
+                field_type = 'time'
+            elif field_type.startswith('decimal'):
+                field_type = 'decimal'
+            elif field_type.startswith('list'):
+                field_type = 'list'
+            elif field_type.startswith('struct'):
+                field_type = 'struct'
+            elif field_type.startswith('map'):
+                field_type = 'map'
+            elif field_type.startswith('dictionary'):
+                field_type = 'dictionary'
+            
+            features_dict[field.name] = field_type
     else:
         features_dict = None
         dataset_type = "UnknownDataset"

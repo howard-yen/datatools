@@ -10,6 +10,7 @@ CORE_DEPS = [
     'zstandard>=0.23.0',
     'universal-pathlib>=0.2.2',
     'fsspec[s3]>=2023.1.0',
+    'pyarrow>=10.0.0',
     # 'transformers==4.39.3',
 ]
 

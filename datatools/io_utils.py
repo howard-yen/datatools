@@ -9,6 +9,10 @@ from upath import UPath
 
 import numpy as np
 from datetime import datetime
+import pandas as pd
+import pyarrow.parquet as pq
+import pyarrow as pa
+import pyarrow.ipc as ipc
 
 from streaming.base.array import Array
 from streaming.base.format import get_index_basename, reader_from_json
@@ -180,6 +184,87 @@ class JsonlDataset(Array):
 
     def get_item(self, idx: int) -> Dict[str, Any]:
         return json.loads(self.lines[idx])
+
+
+class PyArrowDataset(Array):
+    """PyArrow-based dataset that supports parquet and arrow files with local and S3 paths."""
+    
+    def __init__(self, paths: List[Union[UPath, str]]):
+        
+        self.paths = [UPath(path) for path in paths]
+        self.pq = pq
+        self.pa = pa
+        self.ipc = ipc
+        
+        # Load all files and concatenate them
+        self.tables = []
+        for path in self.paths:
+            path_str = str(path)
+            
+            if is_remote_path(path):
+                # For remote paths (S3, GCS, etc.), use fsspec filesystem
+                filesystem = path.fs
+                
+                # Determine file type and load accordingly
+                if path_str.endswith('.parquet'):
+                    table = pq.read_table(path_str, filesystem=filesystem)
+                elif path_str.endswith('.arrow'):
+                    # Read arrow file from remote filesystem
+                    with filesystem.open(path_str, 'rb') as f:
+                        reader = ipc.RecordBatchFileReader(f)
+                        table = reader.read_all()
+                else:
+                    raise ValueError(f"Unsupported file format for path: {path_str}")
+            else:
+                # For local paths, read directly
+                if path_str.endswith('.parquet'):
+                    table = pq.read_table(path_str)
+                elif path_str.endswith('.arrow'):
+                    table = ipc.open_file(path_str).read_all()
+                else:
+                    raise ValueError(f"Unsupported file format for path: {path_str}")
+                    
+            self.tables.append(table)
+        
+        # Concatenate all tables
+        if len(self.tables) > 1:
+            self.table = pa.concat_tables(self.tables)
+        else:
+            self.table = self.tables[0]
+        
+        self.num_rows = self.table.num_rows
+
+    def __len__(self) -> int:
+        return self.num_rows
+
+    @property
+    def size(self) -> int:
+        return self.num_rows
+
+    def __getitem__(self, idx: int) -> Dict[str, Any]:
+        if idx >= self.num_rows:
+            raise IndexError(f"Index {idx} out of range for dataset with {self.num_rows} rows")
+        
+        # Extract row as a dict
+        row_slice = self.table.slice(idx, 1)
+        row_dict = row_slice.to_pandas().iloc[0].to_dict()
+        
+        # Convert pandas/numpy types to Python native types
+        result = {}
+        for key, value in row_dict.items():
+            if pd.isna(value):
+                result[key] = None
+            elif isinstance(value, np.number):
+                result[key] = value.item()
+            elif isinstance(value, np.ndarray):
+                result[key] = value.tolist()
+            else:
+                result[key] = value
+        
+        return result
+
+    def get_item(self, idx: int) -> Dict[str, Any]:
+        return self.__getitem__(idx)
 
 
 
