@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 # Core dependencies (always required)
 CORE_DEPS = [
@@ -21,8 +21,8 @@ DATASET_DEPS = [
 
 setup(
     name='datatools-py',
-    version='0.2',
-    packages=['datatools'],
+    version='0.3',
+    packages=find_packages(),
     install_requires=CORE_DEPS,
     extras_require={
         'datasets': DATASET_DEPS,
