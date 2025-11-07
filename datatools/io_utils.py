@@ -20,6 +20,7 @@ from streaming.base.spanner import Spanner
 from streaming import Stream, StreamingDataset
 
 import zstandard
+import gzip
 from contextlib import contextmanager
 
 
@@ -171,6 +172,9 @@ class JsonlDataset(Array):
             if path.suffixes[-1] in [".zstd", ".zst"]:
                 with zstd_utf8_read_open(path) as f:
                     self.lines.extend(f.readlines())
+            elif path.suffixes[-1] in ['.gz']:
+                with gzip.open(path, 'r') as f:
+                    self.lines.extend([line for line in f])
             else:
                 with open(path) as f:
                     self.lines.extend(f.readlines())

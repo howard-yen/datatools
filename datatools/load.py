@@ -139,4 +139,3 @@ def load_pandas(*input_paths: List[Union[UPath, str]], n_rows: int = -1, num_pro
             return pd.DataFrame(pool.map(dataset.__getitem__, range(n_rows)))
     else:
         return pd.DataFrame([dataset[i] for i in range(n_rows)])
-
